@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="http://getbootstrap.com/examples/justified-nav/justified-nav.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <style>
+        .axis path {
+            fill: none;
+            stroke: #777;
+            shape-rendering: crispEdges;
+        }
+        .axis text {
+            font-family: Lato;
+            font-size: 13px;
+        }
+        #legend-title{
+            display: block;
+            text-align: left;
+            margin-left: 40px;
+            margin-top: 20px;
+        }
+        #keys{
+            display: inline-block;
+            float: left;
+            text-align: left;
+            margin-top: 20px;
+        }
+        #keys2{
+            text-align: left;
+            float: right;
+            margin-right: 200px;
+            margin-top: 20px;
+
+        }
+        #visualisation{
+            display: block;
+        }
+        li{
+            padding: 10px;
+        
+            list-style: none;
+        
+        }
+        .square{
+            width:20px;
+            height:20px;
+            float: left;
+            margin-right: 10px;
+        
+        }
+        .dew-pt{
+            background:green;
+        }
+        .temp{
+            background:red;
+        }
+        .batt{
+            background:#9E30E3;
+        }
+    
+        .gust{
+            background:blue;
+        }
+        .pressure{
+            background:magenta;
+        }
+        .solar-rad{
+            background:orange;
+        }
+        .rh{
+            background:mediumpurple
+        }
+        .rain{
+            background:darkcyan;
+        }
+        .wind-speed{
+            background:lawngreen;
+        }
+        .wind-dir{
+            background:yellow;
+        }
+    
+        .off {
+            background: 
+               linear-gradient(to top left,
+                   rgba(0,0,0,0) 0%,
+                   rgba(0,0,0,0) calc(50% - 0.8px),
+                   rgba(0,0,0,1) 50%,
+                   rgba(0,0,0,0) calc(50% + 0.8px),
+                   rgba(0,0,0,0) 100%),
+               linear-gradient(to top right,
+                   rgba(0,0,0,0) 0%,
+                   rgba(0,0,0,0) calc(50% - 0.8px),
+                   rgba(0,0,0,1) 50%,
+                   rgba(0,0,0,0) calc(50% + 0.8px),
+                   rgba(0,0,0,0) 100%);
+            border-style: solid;
+        }
+        
+    </style>
+
+  </head>
+  <body>
+ 
+    <div class="container">
+         <div class="jumbotron">
+            <svg id="visualisation" width="850" height="500"></svg>
+            <div id="legend-title"><h3>Legend</h3>
+              <h5>(Click on a color key to toggle data line on/off. Data scaled for left axis unless noted.)</h5>
+            </div>
+            <div id="keys">
+      
+              <ul>
+                <li><div class="dew-pt square" onClick="toggle('#dew-pt-line','.dew-pt')"></div>Dew Point [&deg;C]</li>
+                <li><div class="temp square" onClick="toggle('#temp-line','.temp')"></div>Temperature [&deg;C]</li>
+                <li><div class="batt square" onClick="toggle('#batt-line','.batt')"></div>Battery [V]</li>
+                <li><div class="gust square" onClick="toggle('#gust-line','.gust')"></div>Gust Speed</li>
+                <li><div class="pressure square" onClick="toggle('#pressure-line','.pressure')"></div>Pressure (scaled for right axis)</li>
+        
+             </ul>
+            </div>
+            <div id="keys2">
+              <ul>
+                <li><div class="solar-rad square" onClick="toggle('#solar-rad-line','.solar-rad')"></div>Avg. Solar Rad & Solar Rad1 (scaled for right axis)</li>
+                <li><div class="rh square" onClick="toggle('#rh-line','.rh')"></div>RH</li>
+                <li><div class="rain square" onClick="toggle('#rain-line','.rain')"></div>Rain (zero, x-axis)</li>
+                <li><div class="wind-speed square" onClick="toggle('#wind-speed-line','.wind-speed')"></div>Wind Speed</li>
+                <li><div class="wind-dir square off" onClick="toggle('#wind-dir-line','.wind-dir')"></div>Wind Direction</li>
+              </ul>
+            </div>
+        
+    </div>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script type="text/javascript">
+        var vis;
+        var myData=[];
+        var firstDate, lastDate;
+        d3.csv("data_source.csv", function(data) {
+          for(i=0; i<data.length; i++){
+            if(data[i].DewPt != undefined){
+         
+            var dateStr = data[i]['UTC time'];
+            var a=dateStr.split(" ");
+            var d=a[0].split("-");
+            var t=a[1].split(":");
+            var tempdate = new Date(d[0],(d[1]-1),d[2],t[0],t[1],t[2]);
+            
+            data[i]['date']=tempdate.getTime();
+            myData.push(data[i]);
+            if (firstDate == undefined){
+              firstDate = data[i]['date'];
+            }
+              lastDate = data[i]['date'];
+            }
+          }
+        InitChart();
+            //console.log(myData);
+    
+        });
+        function InitChart() {
+          var customTimeFormat = d3.time.format.multi([
+            [".%L", function(d) { return d.getMilliseconds(); }],
+            [":%S", function(d) { return d.getSeconds(); }],
+            ["%I:%M", function(d) { return d.getMinutes(); }],
+            ["%I %p", function(d) { return d.getHours(); }],
+            ["%d", function(d) { return d.getDay() && d.getDate() != 1; }],
+            [" %d", function(d) { return d.getDate() != 1; }],
+            ["%B", function(d) { return d.getMonth(); }],
+            ["%Y", function() { return true; }]
+         ]);
+
+            var vis = d3.select("#visualisation"),
+              WIDTH = 850,
+              HEIGHT = 500,
+              MARGINS = {
+                top: 20,
+                right: 40,
+                bottom: 20,
+                left: 40
+              },
+              xScale = d3.time.scale()
+                .range([MARGINS.left, WIDTH-MARGINS.right])
+                .domain([firstDate,lastDate]),
+              yScale = d3.scale.linear().range([HEIGHT - MARGINS.top, MARGINS.bottom]).domain([0, 100]),
+              yScale2 = d3.scale.linear().range([HEIGHT - MARGINS.top, MARGINS.bottom]).domain([0, 1300]),
+              xAxis = d3.svg.axis()
+                .scale(xScale)
+                .ticks(30)
+                .tickFormat(customTimeFormat),
+              yAxis = d3.svg.axis()
+                .scale(yScale)
+                .orient("left"),
+              yAxis2 = d3.svg.axis()
+                .scale(yScale2)
+                .orient("right");
+                    
+              vis.append("svg:g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + (HEIGHT - MARGINS.bottom) + ")")
+                .style("text-anchor", "middle")
+                .call(xAxis);
+              vis.append("svg:g")
+                .attr("class", "y axis")
+                .attr("transform", "translate(" + (MARGINS.left)+ ",0)")
+                .call(yAxis);
+                    
+              vis.append("svg:g")
+                .attr("class", "y axis")
+                .attr("transform", "translate(" + (WIDTH - MARGINS.right) + ",0)")
+                .call(yAxis2);
+                        
+              var DewPtGen = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale(d.DewPt);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', DewPtGen(myData))
+                .attr('id', "dew-pt-line")
+                .attr('stroke', 'green')
+                .attr('stroke-width', 2)
+                .attr('fill', 'none');
+              
+              var TempGen = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale(d.Temp);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', TempGen(myData))
+                .attr('id', "temp-line")
+                .attr('stroke', 'red')
+                .attr('stroke-width', 2)
+                .attr('fill', 'none');
+                        
+              var Batt = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale(d.Batt);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', Batt(myData))
+                .attr('id', "batt-line")
+                .attr('stroke', '#9E30E3')
+                .attr('stroke-width', 2)
+                .attr('fill', 'none');
+                                            
+              var Gust = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale(d["Gust Speed"]);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', Gust(myData))
+                .attr('id', "gust-line")
+                .attr('stroke', 'blue')
+                .attr('stroke-width', .3)
+                .attr('fill', 'none');
+                    
+              var Pressure = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale2(d.Pressure);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', Pressure(myData))
+                .attr('id', "pressure-line")
+                .attr('stroke', 'magenta')
+                .attr('stroke-width', 2)
+                .attr('fill', 'none');
+                    
+              var SolarRad = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale2((parseFloat(d["Solar Rad"])+parseFloat(d["Solar Rad1"]))/2);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', SolarRad(myData))
+                .attr('id', "solar-rad-line")
+                .attr('stroke', 'orange')
+                .attr('stroke-width', 1)
+                .attr('fill', 'none');
+                    
+              var RHGen = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale(d.RH);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', RHGen(myData))
+                .attr('id', "rh-line")
+                .attr('stroke', 'mediumpurple')
+                .attr('stroke-width', 1)
+                .attr('fill', 'none');
+                    
+              var RainGen = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale(d.Rain);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', RainGen(myData))
+                .attr('id', "rain-line")
+                .attr('stroke', 'DarkCyan')
+                .attr('stroke-width', 1)
+                .attr('fill', 'none');
+                    
+              var WindSpeedGen = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale(d["Wind Speed"]);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', WindSpeedGen(myData))
+                .attr('id', "wind-speed-line")
+                .attr('stroke', 'LawnGreen')
+                .attr('stroke-width', 1)
+                .attr('fill', 'none');
+                //.attr("hidden",null);
+                        
+              var WindDirGen = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.date);
+                })
+                .y(function(d) {
+                    return yScale2(d["Wind Dir"]);
+                })
+                .interpolate("basis");
+              vis.append('svg:path')
+                .attr('d', WindDirGen(myData))
+                .attr('id', "wind-dir-line")
+                .attr('stroke', 'yellow')
+                .attr('stroke-width', 1)
+                .attr('fill', 'none')
+                .attr("hidden", true);
+                    
+        }
+        
+        function toggle(dataID, dataClass) {
+            if(d3.select(dataID).attr('hidden')){
+                console.log("putting element back");
+                d3.select(dataID).attr("hidden",null);
+                $(dataClass).removeClass("off");
+            }else{
+                d3.select(dataID).attr("hidden",true);
+                console.log("hiding element");
+                $(dataClass).addClass("off");
+            }
+        }
+        
+    </script>
+          
+    </div>
+   </body>
+</html>
